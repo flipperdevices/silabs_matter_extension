@@ -606,7 +606,7 @@ void HandleDHCPPolling(void)
 
 /** ResetDHCPNotificationFlags
  *  @brief Reset the flags that are used to notify the application about DHCP connectivity
- *         and emits a WifiEvent::kStationDoDhcp event to trigger DHCP polling checks. Helper function for ProcessEvent.
+ *         and emits a WifiEvent::kConnectionComplete event to trigger DHCP polling checks. Helper function for ProcessEvent.
  */
 void ResetDHCPNotificationFlags(void)
 {
@@ -618,7 +618,7 @@ void ResetDHCPNotificationFlags(void)
     hasNotifiedIPV6             = false;
     hasNotifiedWifiConnectivity = false;
 
-    outEvent = WifiEvent::kStationDoDhcp;
+    outEvent = WifiEvent::kConnectionComplete;
     sl_matter_wifi_post_event(outEvent);
 }
 
@@ -752,7 +752,7 @@ void ProcessEvent(WifiEvent event)
         sl_wifi_platform_join_network();
     }
     break;
-    case WifiEvent::kStationDoDhcp: {
+    case WifiEvent::kConnectionComplete: {
         StartDHCPTimer(WFX_RSI_DHCP_POLL_INTERVAL);
     }
     break;
@@ -829,7 +829,7 @@ void wfx_dhcp_got_ipv4(uint32_t ip)
     ChipLogProgress(DeviceLayer, "DHCP OK: IP=%d.%d.%d.%d", wfx_rsi.ip4_addr[0], wfx_rsi.ip4_addr[1], wfx_rsi.ip4_addr[2],
                     wfx_rsi.ip4_addr[3]);
     /* Notify the Connectivity Manager - via the app */
-    wfx_rsi.dev_state.Set(WifiState::kStationDhcpDone, WifiState::kStationReady);
+    wfx_rsi.dev_state.Set(WifiState::kStationDhcpDone).Set(WifiState::kStationReady);
     wfx_ip_changed_notify(IP_STATUS_SUCCESS);
 }
 #endif /* CHIP_DEVICE_CONFIG_ENABLE_IPV4 */

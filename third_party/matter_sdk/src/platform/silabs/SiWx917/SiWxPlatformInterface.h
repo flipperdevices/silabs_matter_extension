@@ -20,9 +20,9 @@
 #include <app/icd/server/ICDServerConfig.h>
 
 namespace {
-#ifdef ENABLE_CHIP_SHELL
+#if ENABLE_CHIP_SHELL && CHIP_CONFIG_ENABLE_ICD_SERVER
 bool ps_requirement_added = false;
-#endif // ENABLE_CHIP_SHELL
+#endif // ENABLE_CHIP_SHELL && CHIP_CONFIG_ENABLE_ICD_SERVER
 } // namespace
 
 #ifdef __cplusplus
@@ -33,7 +33,7 @@ extern "C" {
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
 #include "sl_si91x_button.h"
 #include "sl_si91x_button_pin_config.h"
-#endif  //SL_CATALOG_SIMPLE_BUTTON_PRESENT
+#endif // SL_CATALOG_SIMPLE_BUTTON_PRESENT
 #include "sl_si91x_driver_gpio.h"
 #include "sl_si91x_power_manager.h"
 
@@ -84,7 +84,7 @@ inline void sl_si91x_btn_event_handler()
     sl_button_on_change(SL_BUTTON_BTN0_NUMBER,
                         (sl_si91x_gpio_get_uulp_npss_pin(SL_BUTTON_BTN0_PIN) == LOW) ? BUTTON_PRESSED : BUTTON_RELEASED);
 }
-#endif  //SL_CATALOG_SIMPLE_BUTTON_PRESENT
+#endif // SL_CATALOG_SIMPLE_BUTTON_PRESENT
 /**
  * @brief      Required to enable MATTER shell UART with ICD feature flag
  * @param[in]  none.

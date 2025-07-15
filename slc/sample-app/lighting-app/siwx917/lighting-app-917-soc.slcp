@@ -3,13 +3,13 @@ label: Matter Light
 description: >
   Matter Lighting App
 quality: production
-package: Matter
+package: matter
 
 sdk_extension:
   - id: matter
-    version: "2.5.1"
+    version: "2.6.0"
   - id: wiseconnect3_sdk
-    version: "3.4.1"
+    version: "3.5.0"
 
 component:
   - id: matter_leds
@@ -19,8 +19,6 @@ component:
   - id: matter_wifi_ble
     from: matter
   - id: matter_crypto_tinycrypt_siwx917
-    from: matter
-  - id: matter_fw_upgrade_917
     from: matter
 
   - id: matter_wifi
@@ -79,7 +77,6 @@ component:
     from: matter
   - id: segger_rtt
 
-  
   - id: matter_ota_requestor
     from: matter
   - id: matter_ota_support
@@ -94,22 +91,15 @@ component:
     from: matter
   - id: matter_log_uart
     from: matter
+  - id: matter_lwip
+    from: matter
 
   - id: matter_lighting
     from: matter
 
-
-  # Copy of the component to point to a different sl_net_for_lwip.c file
-  - id: network_manager
-    from: matter
-
-  # Copy of the component to remove the default lwipopts.h file
   - id: wifi_resources
-    from: matter
-
-  - id: sl_si91x_common_flash_nvm3
     from: wiseconnect3_sdk
-  - id: sl_si91x_lwip_stack
+  - id: sl_si91x_common_flash_nvm3
     from: wiseconnect3_sdk
   - id: sl_si91x_wireless
     from: wiseconnect3_sdk
@@ -136,7 +126,7 @@ component:
   - id: ble
     from: wiseconnect3_sdk
   - id: sl_si91x_button_917
-    instance: [btn0,btn1]
+    instance: [btn0, btn1]
     from: wiseconnect3_sdk
   - id: sl_si91x_led_917
     instance: [led0]
@@ -155,7 +145,8 @@ component:
     id: ulp_timers_instance
 
 configuration:
-  - {name: SL_ULPUART_DMA_CONFIG_ENABLE, value: '0'}
+  - name: SL_ULPUART_DMA_CONFIG_ENABLE
+    value: "0"
 
 config_file:
   - path: ../../../../third_party/matter_sdk/examples/lighting-app/silabs/data_model/lighting-wifi-app.zap

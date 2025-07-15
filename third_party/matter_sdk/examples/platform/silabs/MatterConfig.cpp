@@ -66,9 +66,9 @@
 static chip::DeviceLayer::Internal::Efr32PsaOperationalKeystore gOperationalKeystore;
 #endif
 
-#include <ProvisionManager.h>
 #include <app/InteractionModelEngine.h>
 #include <app/TimerDelegates.h>
+#include <headers/ProvisionManager.h>
 
 #ifdef SL_MATTER_TEST_EVENT_TRIGGER_ENABLED
 #include "SilabsTestEventTriggerDelegate.h" // nogncheck
@@ -92,14 +92,6 @@ static chip::DeviceLayer::Internal::Efr32PsaOperationalKeystore gOperationalKeys
 #include <app/server/Server.h>
 
 #include <platform/silabs/platformAbstraction/SilabsPlatform.h>
-
-#if CHIP_ENABLE_OPENTHREAD && (SL_MATTER_GN_BUILD == 0)
-// SLC-FIX
-// TODO: Remove the Power Manager include when OT does not add an EM1 req at init
-#define CURRENT_MODULE_NAME "OPENTHREAD"
-#include "sl_power_manager.h"
-#endif
-
 #include <platform/silabs/tracing/SilabsTracingMacros.h>
 #if MATTER_TRACING_ENABLED
 #include <platform/silabs/tracing/BackendImpl.h>
@@ -175,14 +167,19 @@ namespace {
 
 constexpr uint32_t kMainTaskStackSize = (1024 * 5);
 // Task is dynamically allocated with max priority. This task gets deleted once the inits are completed.
-constexpr osThreadAttr_t kMainTaskAttr = { .name       = "main",
-                                           .attr_bits  = osThreadDetached,
-                                           .cb_mem     = NULL,
-                                           .cb_size    = 0U,
-                                           .stack_mem  = NULL,
-                                           .stack_size = kMainTaskStackSize,
-                                           .priority   = osPriorityLow7 };
-                                           //.priority   = osPriorityRealtime7 };
+constexpr osThreadAttr_t kMainTaskAttr = {
+    .name       = "main",
+    .attr_bits  = osThreadDetached,
+    .cb_mem     = NULL,
+    .cb_size    = 0U,
+    .stack_mem  = NULL,
+    .stack_size = kMainTaskStackSize,
+#ifdef SLI_SI91X_MCU_INTERFACE
+    .priority = osPriorityRealtime4,
+#else
+    .priority = osPriorityRealtime7
+#endif // SLI_SI91X_MCU_INTERFACE
+};
 osThreadId_t sMainTaskHandle;
 static chip::DeviceLayer::DeviceInfoProviderImpl gExampleDeviceInfoProvider;
 
@@ -215,24 +212,23 @@ void ApplicationStart(void * unused)
 
 void SilabsMatterConfig::AppInit()
 {
-#if CHIP_ENABLE_OPENTHREAD && (SL_MATTER_GN_BUILD == 0)
-    // SLC-FIX
-    // TODO: Remove the Power Manager remove req when OT does not add an EM1 req at init
-    sl_power_manager_remove_em_requirement(SL_POWER_MANAGER_EM1);
-#endif
     GetPlatform().Init();
     sMainTaskHandle = osThreadNew(ApplicationStart, nullptr, &kMainTaskAttr);
     ChipLogProgress(DeviceLayer, "Starting Matter");
     //ChipLogProgress(DeviceLayer, "Starting scheduler");
     VerifyOrDie(sMainTaskHandle); // We can't proceed if the Main Task creation failed.
-    osThreadTerminate(sMainTaskHandle);
-    sMainTaskHandle = nullptr;
-    //GetPlatform().StartScheduler();
+
+// SL-TEMP: GN cannot use sl_main until it supports sisdk 2025.6
+// sl_system_init is always used for 917 soc
+// Also use sl_system for projects upgraded to 2025.6, identified by the presence of SL_CATALOG_CUSTOM_MAIN_PRESENT
+#if (SL_MATTER_GN_BUILD == 1 || SLI_SI91X_MCU_INTERFACE) || defined(SL_CATALOG_CUSTOM_MAIN_PRESENT)
+    GetPlatform().StartScheduler();
 
     // Should never get here.
-    //chip::Platform::MemoryShutdown();
-    //ChipLogProgress(DeviceLayer, "Start Scheduler Failed");
-    //appError(CHIP_ERROR_INTERNAL);
+    chip::Platform::MemoryShutdown();
+    ChipLogError(DeviceLayer, "Start Scheduler Failed, Not enough RAM");
+    appError(CHIP_ERROR_NO_MEMORY);
+#endif
 }
 
 CHIP_ERROR SilabsMatterConfig::InitMatter(const char * appName)
@@ -398,7 +394,7 @@ extern "C" void vApplicationIdleHook(void)
 #if (SLI_SI91X_MCU_INTERFACE && CHIP_CONFIG_ENABLE_ICD_SERVER)
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
     SiWxPlatformInterface::sl_si91x_btn_event_handler();
-#endif  //SL_CATALOG_SIMPLE_BUTTON_PRESENT
+#endif // SL_CATALOG_SIMPLE_BUTTON_PRESENT
     SiWxPlatformInterface::sl_si91x_uart_power_requirement_handler();
 #endif
 }

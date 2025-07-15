@@ -46,10 +46,19 @@
 #endif // ENABLE_CHIP_SHELL
 #endif // CHIP_CONFIG_ENABLE_ICD_SERVER
 
-#include <ProvisionManager.h>
 #include <app/server/OnboardingCodesUtil.h>
+
+#if defined(SL_BLE_SIDE_CHANNEL_ENABLED) && SL_BLE_SIDE_CHANNEL_ENABLED
+#include <platform/internal/BLEManager.h>
+#include <platform/silabs/efr32/BLEChannelImpl.h>
+#ifdef ENABLE_CHIP_SHELL
+#include <BLEShellCommands.h>
+#endif // ENABLE_CHIP_SHELL
+#endif // defined(SL_BLE_SIDE_CHANNEL_ENABLED) && SL_BLE_SIDE_CHANNEL_ENABLED
+
 #include <app/util/attribute-storage.h>
 #include <assert.h>
+#include <headers/ProvisionManager.h>
 #include <lib/support/CodeUtils.h>
 #include <platform/CHIPDeviceLayer.h>
 #include <setup_payload/QRCodeSetupPayloadGenerator.h>
@@ -127,6 +136,9 @@ using namespace ::chip::DeviceLayer;
 using namespace ::chip::DeviceLayer::Silabs;
 
 using TimeTraceOperation = chip::Tracing::Silabs::TimeTraceOperation;
+#if defined(SL_BLE_SIDE_CHANNEL_ENABLED) && SL_BLE_SIDE_CHANNEL_ENABLED
+using BLEChannelImpl = chip::DeviceLayer::Internal::BLEChannelImpl;
+#endif // defined(SL_BLE_SIDE_CHANNEL_ENABLED) && SL_BLE_SIDE_CHANNEL_ENABLED
 namespace {
 
 /**********************************************************
@@ -189,6 +201,10 @@ Identify gIdentify = {
 };
 
 #endif // MATTER_DM_PLUGIN_IDENTIFY_SERVER
+
+#if defined(SL_BLE_SIDE_CHANNEL_ENABLED) && SL_BLE_SIDE_CHANNEL_ENABLED
+BLEChannelImpl sBleSideChannel;
+#endif // defined(SL_BLE_SIDE_CHANNEL_ENABLED) && SL_BLE_SIDE_CHANNEL_ENABLED
 
 } // namespace
 
@@ -253,7 +269,7 @@ void BaseApplicationDelegate::OnCommissioningWindowClosed()
         SilabsLCD::Screen_e screen;
         slLCD.GetScreen(screen);
         VerifyOrReturn(screen == SilabsLCD::Screen_e::QRCodeScreen);
-        slLCD.SetScreen(SilabsLCD::Screen_e::DemoScreen);
+        BaseApplication::PostUpdateDisplayEvent(SilabsLCD::Screen_e::DemoScreen);
 #endif // QR_CODE_ENABLED
 #endif // DISPLAY_ENABLED
     }
@@ -303,7 +319,34 @@ CHIP_ERROR BaseApplication::StartAppTask(osThreadFunc_t taskFunction)
 
 CHIP_ERROR BaseApplication::Init()
 {
+    CHIP_ERROR err = BaseInit();
+    if (err != CHIP_NO_ERROR)
+    {
+        SILABS_LOG("BaseInit() failed");
+        appError(err);
+        return err;
+    }
+
+    err = AppInit();
+    if (err != CHIP_NO_ERROR)
+    {
+        SILABS_LOG("AppInit() failed");
+        appError(err);
+        return err;
+    }
+
+    SILABS_TRACE_END_ERROR(TimeTraceOperation::kAppInit, err);
+    SILABS_TRACE_END_ERROR(TimeTraceOperation::kBootup, err);
+    return err;
+}
+
+CHIP_ERROR BaseApplication::BaseInit()
+{
     CHIP_ERROR err = CHIP_NO_ERROR;
+
+#ifdef DISPLAY_ENABLED
+    GetLCD().Init((uint8_t *) APP_TASK_NAME);
+#endif
 
 #ifdef SL_WIFI
     /*
@@ -365,6 +408,9 @@ CHIP_ERROR BaseApplication::Init()
 #if MATTER_TRACING_ENABLED
     TracingCommands::RegisterCommands();
 #endif // MATTER_TRACING_ENABLED
+#if defined(SL_BLE_SIDE_CHANNEL_ENABLED) && SL_BLE_SIDE_CHANNEL_ENABLED
+    BLEShellCommands::RegisterCommands();
+#endif // defined(SL_BLE_SIDE_CHANNEL_ENABLED) && SL_BLE_SIDE_CHANNEL_ENABLED
 #endif // ENABLE_CHIP_SHELL
 
 #ifdef PERFORMANCE_TEST_ENABLED
@@ -378,15 +424,18 @@ CHIP_ERROR BaseApplication::Init()
 #if CHIP_ENABLE_OPENTHREAD
     BaseApplication::sIsProvisioned = ConnectivityMgr().IsThreadProvisioned();
 #endif
+#if defined(SL_BLE_SIDE_CHANNEL_ENABLED) && SL_BLE_SIDE_CHANNEL_ENABLED
+    ReturnErrorOnFailure(sBleSideChannel.Init());
+    DeviceLayer::Internal::BLEMgrImpl().InjectSideChannel(&sBleSideChannel);
+#endif
 
     err = chip::Server::GetInstance().GetFabricTable().AddFabricDelegate(&sAppDelegate);
     return err;
 }
 
-void BaseApplication::InitCompleteCallback(CHIP_ERROR err)
+void BaseApplication::InitCompleteCallback([[maybe_unused]] CHIP_ERROR err)
 {
-    SILABS_TRACE_END(TimeTraceOperation::kAppInit);
-    SILABS_TRACE_END(TimeTraceOperation::kBootup);
+    // A stub for backward compatibility
 }
 
 void BaseApplication::FunctionTimerEventHandler(void * timerCbArg)
@@ -599,8 +648,6 @@ void BaseApplication::ButtonHandler(AppEvent * aEvent)
             // - Cycle LCD screen
             CancelFunctionTimer();
 
-            AppTask::GetAppTask().UpdateDisplay();
-
 #ifdef SL_WIFI
             if (!ConnectivityMgr().IsWiFiStationProvisioned())
 #else
@@ -624,17 +671,14 @@ void BaseApplication::ButtonHandler(AppEvent * aEvent)
                 PlatformMgr().ScheduleWork([](intptr_t) { ICDNotifier::GetInstance().NotifyNetworkActivityNotification(); });
 #endif // CHIP_CONFIG_ENABLE_ICD_SERVER
             }
+
+            // Print the QR Code
+            OutputQrCode(false);
+#ifdef DISPLAY_ENABLED
+            PostUpdateDisplayEvent(SilabsLCD::Screen_e::CycleScreen);
+#endif // DISPLAY_ENABLED
         }
     }
-}
-
-void BaseApplication::UpdateDisplay()
-{
-    OutputQrCode(false);
-#ifdef DISPLAY_ENABLED
-    UpdateLCDStatusScreen();
-    slLCD.CycleScreens();
-#endif
 }
 
 void BaseApplication::CancelFunctionTimer()
@@ -795,14 +839,37 @@ SilabsLCD & BaseApplication::GetLCD(void)
     return slLCD;
 }
 
-void BaseApplication::UpdateLCDStatusScreen(bool withChipStackLock)
+void BaseApplication::PostUpdateDisplayEvent(SilabsLCD::Screen_e screen)
+{
+    AppEvent event;
+    event.Type            = AppEvent::kEventType_LCD;
+    event.LCDEvent.screen = screen;
+    event.Handler         = AppTask::GetAppTask().UpdateDisplayHandler;
+    BaseApplication::PostEvent(&event);
+}
+
+void BaseApplication::UpdateDisplayHandler(AppEvent * aEvent)
+{
+    VerifyOrReturn(aEvent->Type == AppEvent::kEventType_LCD);
+    SilabsLCD::Screen_e screen = aEvent->LCDEvent.screen;
+    if (screen == SilabsLCD::Screen_e::StatusScreen)
+    {
+        UpdateLCDStatusScreen();
+    }
+    (screen == SilabsLCD::Screen_e::CycleScreen) ? AppTask::GetAppTask().UpdateDisplay() : AppTask::GetLCD().SetScreen(screen);
+}
+
+void BaseApplication::UpdateDisplay()
+{
+    UpdateLCDStatusScreen();
+    slLCD.CycleScreens();
+}
+
+void BaseApplication::UpdateLCDStatusScreen()
 {
     SilabsLCD::DisplayStatus_t status;
     bool enabled, attached;
-    if (withChipStackLock)
-    {
-        chip::DeviceLayer::PlatformMgr().LockChipStack();
-    }
+    chip::DeviceLayer::PlatformMgr().LockChipStack();
 #ifdef SL_WIFI
     enabled  = ConnectivityMgr().IsWiFiStationEnabled();
     attached = ConnectivityMgr().IsWiFiStationConnected();
@@ -827,10 +894,7 @@ void BaseApplication::UpdateLCDStatusScreen(bool withChipStackLock)
         ? SilabsLCD::ICDMode_e::SIT
         : SilabsLCD::ICDMode_e::LIT;
 #endif
-    if (withChipStackLock)
-    {
-        chip::DeviceLayer::PlatformMgr().UnlockChipStack();
-    }
+    chip::DeviceLayer::PlatformMgr().UnlockChipStack();
     slLCD.SetStatus(status);
 }
 #endif
@@ -884,10 +948,16 @@ void BaseApplication::ScheduleFactoryReset()
 void BaseApplication::DoProvisioningReset()
 {
     PlatformMgr().ScheduleWork([](intptr_t) {
+        // Force the KeyMap update to make sure nvm3 is updated before anything happens.
+        // If the device reboots before the timer update happens, "shadow" keys are left in nvm3 causing a reduction of the
+        // overall available nvm3 - similar to a memory leak.
+        // FactoryResetThreadStack forces a reboot which was causing a memory loss.
+        chip::DeviceLayer::PersistedStorage::KeyValueStoreMgrImpl().ForceKeyMapSave();
+
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
         ConfigurationManagerImpl::GetDefaultInstance().ClearThreadStack();
         ThreadStackMgrImpl().FactoryResetThreadStack();
-        ThreadStackMgr().InitThreadStack();
+        // Triggers a reboot - nothing gets executed after this
 #endif // CHIP_DEVICE_CONFIG_ENABLE_THREAD
 
 #if CHIP_DEVICE_CONFIG_ENABLE_WIFI_STATION
@@ -945,8 +1015,7 @@ void BaseApplication::OnPlatformEvent(const ChipDeviceEvent * event, intptr_t)
         // Update the LCD screen with SSID and connected state
         if (screen == SilabsLCD::Screen_e::StatusScreen)
         {
-            BaseApplication::UpdateLCDStatusScreen(false);
-            AppTask::GetLCD().SetScreen(screen);
+            PostUpdateDisplayEvent(SilabsLCD::Screen_e::StatusScreen);
         }
 #endif // DISPLAY_ENABLED
 
@@ -966,6 +1035,15 @@ void BaseApplication::OnPlatformEvent(const ChipDeviceEvent * event, intptr_t)
                                                         InitOTARequestorHandler, nullptr);
 #endif // SILABS_OTA_ENABLED
         }
+    }
+    break;
+
+    case DeviceEventType::kDnssdInitialized: {
+#if SILABS_OTA_ENABLED
+        ChipLogProgress(AppServer, "DNS-SD initialized, scheduling OTA Requestor initialization");
+        chip::DeviceLayer::SystemLayer().StartTimer(chip::System::Clock::Seconds32(OTAConfig::kInitOTARequestorDelaySec),
+                                                    InitOTARequestorHandler, nullptr);
+#endif // SILABS_OTA_ENABLED
     }
     break;
 

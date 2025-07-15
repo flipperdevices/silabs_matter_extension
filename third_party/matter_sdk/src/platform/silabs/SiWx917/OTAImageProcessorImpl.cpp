@@ -20,6 +20,7 @@
 #include <app/clusters/ota-requestor/OTARequestorInterface.h>
 #include <platform/silabs/OTAImageProcessorImpl.h>
 #include <platform/silabs/SilabsConfig.h>
+#include <platform/silabs/platformAbstraction/SilabsPlatform.h>
 
 #if CHIP_CONFIG_ENABLE_ICD_SERVER
 #include <platform/silabs/wifi/icd/WifiSleepManager.h>
@@ -41,6 +42,8 @@ extern "C" {
 
 uint8_t flag = RPS_HEADER;
 static chip::OTAImageProcessorImpl gImageProcessor;
+
+using namespace chip::DeviceLayer::Silabs;
 
 namespace chip {
 
@@ -117,6 +120,7 @@ CHIP_ERROR OTAImageProcessorImpl::ConfirmCurrentImage()
     OTARequestorInterface * requestor = chip::GetRequestorInstance();
     if (requestor == nullptr)
     {
+        ChipLogError(SoftwareUpdate, "OTARequestorInterface is null");
         return CHIP_ERROR_INTERNAL;
     }
 
@@ -135,7 +139,6 @@ CHIP_ERROR OTAImageProcessorImpl::ConfirmCurrentImage()
 
 void OTAImageProcessorImpl::HandlePrepareDownload(intptr_t context)
 {
-    int32_t status        = SL_STATUS_OK;
     auto * imageProcessor = reinterpret_cast<OTAImageProcessorImpl *>(context);
 
     if (imageProcessor == nullptr)
@@ -208,8 +211,6 @@ void OTAImageProcessorImpl::HandleFinalize(intptr_t context)
 
 void OTAImageProcessorImpl::HandleApply(intptr_t context)
 {
-    int32_t status = SL_STATUS_OK;
-
     ChipLogProgress(SoftwareUpdate, "OTAImageProcessorImpl::HandleApply()");
 
     // Force KVS to store pending keys such as data from StoreCurrentUpdateInfo()
@@ -228,7 +229,7 @@ void OTAImageProcessorImpl::HandleApply(intptr_t context)
         // send system reset request to reset the MCU and upgrade the m4 image
         ChipLogProgress(SoftwareUpdate, "SoC Soft Reset initiated!");
         // Reboots the device
-        sl_si91x_soc_nvic_reset();
+        GetPlatform().SoftwareReset();
     }
 }
 
@@ -252,7 +253,6 @@ void OTAImageProcessorImpl::HandleAbort(intptr_t context)
 void OTAImageProcessorImpl::HandleProcessBlock(intptr_t context)
 {
     int32_t status        = SL_STATUS_OK;
-    int32_t content_block = 0;
     auto * imageProcessor = reinterpret_cast<OTAImageProcessorImpl *>(context);
     if (imageProcessor == nullptr)
     {

@@ -1,7 +1,7 @@
 id: matter_log_uart
 label: Logging to UART
 description: Sets Log Destination to UART
-package: "Matter"
+package: matter
 category: Platform|Utils
 quality: production
 metadata:
@@ -9,11 +9,12 @@ metadata:
     license: Zlib
 provides:
   - name: matter_log_uart
+
+requires:
+  - name: matter_uart
+
 define:
   - name: SILABS_LOG_OUT_UART
     value: 1
-    condition:
-      - matter_uart
 conflicts:
   - name: matter_log_rtt
-  

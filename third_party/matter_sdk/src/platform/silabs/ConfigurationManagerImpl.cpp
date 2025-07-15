@@ -33,6 +33,11 @@
 #include <platform/silabs/wifi/WifiInterfaceAbstraction.h>
 #endif
 
+#include "sl_component_catalog.h"
+#ifdef SL_CATALOG_ZIGBEE_STACK_COMMON_PRESENT
+#include "ZigbeeCallbacks.h"
+#endif // SL_CATALOG_ZIGBEE_STACK_COMMON_PRESENT
+
 namespace chip {
 namespace DeviceLayer {
 
@@ -91,8 +96,7 @@ CHIP_ERROR ConfigurationManagerImpl::GetBootReason(uint32_t & bootReason)
 {
     // rebootCause is obtained at bootup.
     BootReasonType matterBootCause;
-    uint32_t rebootCause = Silabs::GetPlatform().GetRebootCause();
-
+    [[maybe_unused]] uint32_t rebootCause = Silabs::GetPlatform().GetRebootCause();
 #if defined(_RMU_RSTCAUSE_MASK)
     if (rebootCause & RMU_RSTCAUSE_PORST || rebootCause & RMU_RSTCAUSE_EXTRST) // PowerOn or External pin reset
     {
@@ -285,6 +289,9 @@ void ConfigurationManagerImpl::DoFactoryReset(intptr_t arg)
     }
 
     GetDefaultInstance().ClearThreadStack();
+#ifdef SL_CATALOG_ZIGBEE_STACK_COMMON_PRESENT
+    Zigbee::TokenFactoryReset();
+#endif
 
     PersistedStorage::KeyValueStoreMgrImpl().ErasePartition();
 
@@ -306,7 +313,7 @@ void ConfigurationManagerImpl::DoFactoryReset(intptr_t arg)
     // Block the task for 500 ms before the reset occurs to allow RPC response to be sent
     vTaskDelay(pdMS_TO_TICKS(500));
 
-    NVIC_SystemReset();
+    Silabs::GetPlatform().SoftwareReset();
 }
 
 #ifdef SL_WIFI

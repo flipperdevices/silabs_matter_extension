@@ -14,11 +14,11 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
-#include "AttestationKey.h"
-#include "ProvisionEncoder.h"
-#include "ProvisionStorage.h"
 #include <algorithm>
 #include <credentials/examples/DeviceAttestationCredsExample.h>
+#include <headers/AttestationKey.h>
+#include <headers/ProvisionEncoder.h>
+#include <headers/ProvisionStorage.h>
 #include <lib/core/CHIPEncoding.h>
 #include <lib/support/CHIPMemString.h>
 #include <lib/support/CodeUtils.h>
@@ -28,6 +28,10 @@
 #ifdef OTA_ENCRYPTION_ENABLE
 #include <platform/silabs/multi-ota/OtaTlvEncryptionKey.h>
 #endif // OTA_ENCRYPTION_ENABLE
+
+#if !(SL_MATTER_GN_BUILD || defined(SL_PROVISION_GENERATOR))
+#include <sl_matter_provision_config.h>
+#endif
 
 using namespace chip::Credentials;
 
@@ -78,7 +82,7 @@ CHIP_ERROR DecodeTotal(Encoding::Buffer & reader, uint16_t & total)
     ReturnErrorOnFailure(reader.Get(sz));
     total     = (0xffff == sz) ? sizeof(uint16_t) : sz;
     reader.in = reader.begin + total;
-    VerifyOrReturnError(reader.in <= reader.end, CHIP_ERROR_INTERNAL);
+    VerifyOrReturnError(reader.in <= reader.end, CHIP_ERROR_INTERNAL, ChipLogError(DeviceLayer, "Invalid page, or corrupted data"));
     return CHIP_NO_ERROR;
 }
 
@@ -232,7 +236,7 @@ CHIP_ERROR Get(uint16_t id, uint8_t * value, size_t max_size, size_t & size)
     Encoding::Version2::Argument arg(temp, sizeof(temp));
     ReturnErrorOnFailure(Get(id, arg));
     VerifyOrReturnError(Encoding::Version2::Type_Binary == arg.type, CHIP_ERROR_INVALID_ARGUMENT);
-    VerifyOrReturnError(arg.size <= max_size, CHIP_ERROR_INTERNAL);
+    VerifyOrReturnError(arg.size <= max_size, CHIP_ERROR_BUFFER_TOO_SMALL);
     memcpy(value, arg.value.b, arg.size);
     size = arg.size;
     return CHIP_NO_ERROR;
@@ -719,10 +723,49 @@ CHIP_ERROR Storage::GetProvisionRequest(bool & value)
     // return Flash::Set(Parameters::ID::kProvisionRequest, value);
     return CHIP_ERROR_NOT_IMPLEMENTED;
 }
+
 #if OTA_ENCRYPTION_ENABLE
 CHIP_ERROR Storage::SetOtaTlvEncryptionKey(const ByteSpan & value)
 {
-    return CHIP_ERROR_NOT_IMPLEMENTED;
+#if defined(SL_MBEDTLS_USE_TINYCRYPT)
+    // Tinycrypt doesn't support the key ID, so we need to store the key as a binary blob
+    return Flash::Set(Parameters::ID::kOtaTlvEncryptionKey, value.data(), value.size());
+#else  // MBEDTLS_USE_PSA_CRYPTO
+    Silabs::OtaTlvEncryptionKey key;
+    ReturnErrorOnFailure(key.Import(value.data(), value.size()));
+    return Flash::Set(Parameters::ID::kOtaTlvEncryptionKey, key.GetId());
+#endif // SL_MBEDTLS_USE_TINYCRYPT
+}
+
+CHIP_ERROR Storage::GetOtaTlvEncryptionKeyId(uint32_t & keyId)
+{
+#if defined(SL_MBEDTLS_USE_TINYCRYPT)
+    // Tinycrypt doesn't support the key ID
+    return CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE;
+#else  // MBEDTLS_USE_PSA_CRYPTO
+    return Flash::Get(Parameters::ID::kOtaTlvEncryptionKey, keyId);
+#endif // SL_MBEDTLS_USE_TINYCRYPT
+}
+
+CHIP_ERROR Storage::DecryptUsingOtaTlvEncryptionKey(MutableByteSpan & block, uint32_t & ivOffset)
+{
+#if defined(SL_MBEDTLS_USE_TINYCRYPT)
+    uint8_t keyBuffer[Silabs::OtaTlvEncryptionKey::kOTAEncryptionKeyLength] = { 0 };
+    size_t keyLen                                                           = 0;
+
+    // Read the key from the provisioning storage
+    MutableByteSpan keySpan = MutableByteSpan(keyBuffer);
+
+    ReturnErrorOnFailure(Flash::Get(Parameters::ID::kOtaTlvEncryptionKey, keySpan.data(), keySpan.size(), keyLen));
+    keySpan.reduce_size(keyLen);
+
+    VerifyOrReturnError(keySpan.size() == Silabs::OtaTlvEncryptionKey::kOTAEncryptionKeyLength, CHIP_ERROR_INVALID_ARGUMENT);
+
+    Silabs::OtaTlvEncryptionKey::Decrypt((const ByteSpan) keySpan, block, ivOffset);
+    return CHIP_NO_ERROR;
+#else  // MBEDTLS_USE_PSA_CRYPTO
+    return CHIP_ERROR_UNSUPPORTED_CHIP_FEATURE;
+#endif // SL_MBEDTLS_USE_TINYCRYPT
 }
 #endif // OTA_ENCRYPTION_ENABLE
 

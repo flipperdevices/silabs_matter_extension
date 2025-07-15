@@ -1,7 +1,7 @@
 # Matter SiWx917 SoC Light Switch Example
 
 The SiWx917 SoC light switch example provides a baseline demonstration of a on-off
-light switch device, built using Matter and the Silicon Labs Gecko SDK. It can
+light switch device, built using Matter and the Silicon Labs simplicity SDK. It can
 be controlled by a Matter controller over Wifi network.
 
 The SiWx917 SoC device can be commissioned over Bluetooth Low Energy where the device
@@ -19,7 +19,14 @@ out-of-the-box and therefore has the matter_icd_management component enabled.**
 
 For more general information on running matter applications and pre-requisites please look at online 
 documentation for Matter available on docs.silabs.com. Follow Wi-Fi instructions depending on the example you are running.
-[Demo instructions for Wi-Fi](https://docs.silabs.com/matter/2.5.1/matter-wifi)
+[Demo instructions for Wi-Fi](https://docs.silabs.com/matter/2.6.0/matter-wifi)
+
+## Region code Setting (917 WiFi projects)
+
+In Wifi configurations, the region code can be set in this
+[file](https://github.com/SiliconLabsSoftware/matter_sdk/blob/085bd03532990e5b1f99ff4b08ebce4f4ca5edf6/src/platform/silabs/wifi/SiWx/WifiInterface.cpp#L125).
+The available region codes can be found
+[here](https://github.com/SiliconLabs/wiseconnect/blob/f675628eefa1ac4990e94146abb75dd08b522571/components/device/silabs/si91x/wireless/inc/sl_si91x_types.h#L71)
 
 ## Light Switch Specific Interface
 
