@@ -174,11 +174,11 @@ constexpr osThreadAttr_t kMainTaskAttr = {
     .cb_size    = 0U,
     .stack_mem  = NULL,
     .stack_size = kMainTaskStackSize,
-#ifdef SLI_SI91X_MCU_INTERFACE
-    .priority = osPriorityRealtime4,
-#else
-    .priority = osPriorityRealtime7
-#endif // SLI_SI91X_MCU_INTERFACE
+// #ifdef SLI_SI91X_MCU_INTERFACE
+//     .priority = osPriorityRealtime4,
+// #else
+    .priority = osPriorityLow7,
+// #endif // SLI_SI91X_MCU_INTERFACE
 };
 osThreadId_t sMainTaskHandle;
 static chip::DeviceLayer::DeviceInfoProviderImpl gExampleDeviceInfoProvider;
@@ -212,22 +212,29 @@ void ApplicationStart(void * unused)
 
 void SilabsMatterConfig::AppInit()
 {
+#if SILABS_LOG_ENABLED
+    silabsInitLog();
+    uartConsoleInit();
+    osDelay(100);
+#endif
     GetPlatform().Init();
     sMainTaskHandle = osThreadNew(ApplicationStart, nullptr, &kMainTaskAttr);
     ChipLogProgress(DeviceLayer, "Starting Matter");
     //ChipLogProgress(DeviceLayer, "Starting scheduler");
     VerifyOrDie(sMainTaskHandle); // We can't proceed if the Main Task creation failed.
+    osThreadTerminate(sMainTaskHandle);
+    sMainTaskHandle = nullptr;
 
 // SL-TEMP: GN cannot use sl_main until it supports sisdk 2025.6
 // sl_system_init is always used for 917 soc
 // Also use sl_system for projects upgraded to 2025.6, identified by the presence of SL_CATALOG_CUSTOM_MAIN_PRESENT
 #if (SL_MATTER_GN_BUILD == 1 || SLI_SI91X_MCU_INTERFACE) || defined(SL_CATALOG_CUSTOM_MAIN_PRESENT)
-    GetPlatform().StartScheduler();
+    // GetPlatform().StartScheduler();
 
     // Should never get here.
-    chip::Platform::MemoryShutdown();
-    ChipLogError(DeviceLayer, "Start Scheduler Failed, Not enough RAM");
-    appError(CHIP_ERROR_NO_MEMORY);
+    // chip::Platform::MemoryShutdown();
+    // ChipLogError(DeviceLayer, "Start Scheduler Failed, Not enough RAM");
+    // appError(CHIP_ERROR_NO_MEMORY);
 #endif
 }
 

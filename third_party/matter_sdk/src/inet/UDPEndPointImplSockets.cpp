@@ -86,6 +86,10 @@
     "Neither IPV6_DROP_MEMBERSHIP nor IPV6_LEAVE_GROUP are defined which are required for generalized IPv6 multicast group support."
 #endif // IPV6_DROP_MEMBERSHIP
 
+#undef SO_REUSEPORT
+#undef IPV6_V6ONLY
+#undef IPV6_RECVPKTINFO
+
 namespace chip {
 namespace Inet {
 

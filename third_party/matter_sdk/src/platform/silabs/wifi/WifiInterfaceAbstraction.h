@@ -14,15 +14,6 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
-
-/*
- * Modified by Flipper Devices Inc.
- * List of changes:
- *   - commented out lwIP includes
- *   - commented out lwIP declarations
- *   - removed WifiEvent::kStationDhcpPoll
- */
-
 #pragma once
 
 #include <app/icd/server/ICDServerConfig.h>
@@ -238,10 +229,10 @@ void wfx_connected_notify(int32_t status, sl_wfx_mac_address_t * ap);
 void wfx_disconnected_notify(int32_t status);
 
 /* Implemented for LWIP */
-// void wfx_lwip_set_sta_link_up(void);
-// void wfx_lwip_set_sta_link_down(void);
-// void sl_matter_lwip_start(void);
-// struct netif * wfx_get_netif(sl_wfx_interface_t interface);
+void wfx_lwip_set_sta_link_up(void);
+void wfx_lwip_set_sta_link_down(void);
+void sl_matter_lwip_start(void);
+struct netif * wfx_get_netif(sl_wfx_interface_t interface);
 
 #if CHIP_DEVICE_CONFIG_ENABLE_IPV4
 void wfx_dhcp_got_ipv4(uint32_t);

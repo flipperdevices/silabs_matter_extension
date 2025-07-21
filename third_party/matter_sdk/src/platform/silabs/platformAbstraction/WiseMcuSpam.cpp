@@ -24,6 +24,8 @@
 #include <app/icd/server/ICDServerConfig.h>
 #include <lib/support/CodeUtils.h>
 
+#include <inet/UDPEndPointImplSockets.h>
+
 #include <lib/support/CodeUtils.h>
 #if SILABS_LOG_ENABLED
 #include "silabs_utils.h"
@@ -73,6 +75,11 @@ void soc_pll_config(void);
 #include "uart.h"
 #endif
 
+extern "C" {
+#include <sl_net.h>
+#include <furi.h>
+}
+
 namespace chip {
 namespace DeviceLayer {
 namespace Silabs {
@@ -89,6 +96,48 @@ bool btn0_pressed = false;
 
 SilabsPlatform SilabsPlatform::sSilabsPlatformAbstractionManager;
 SilabsPlatform::SilabsButtonCb SilabsPlatform::mButtonCallback = nullptr;
+
+using chip::Inet::UDPEndPointImplSockets;
+using chip::Inet::InterfaceId;
+using chip::Inet::IPAddress;
+
+/**
+ * @brief Swaps between network byte order (big endian) and host byte order
+ * (little endian) 32-bit-word-wise
+ */
+static void swap_addr_byteorder(void* v6_addr) {
+    for(size_t i = 0; i < 16 / 4; i++) {
+        uint32_t* word_ptr = (uint32_t*)v6_addr + i;
+        *word_ptr = REVERSE_BYTES_U32(*word_ptr);
+    }
+}
+
+static CHIP_ERROR MulticastHandler(InterfaceId iface_id, const IPAddress & ip_addr, UDPEndPointImplSockets::MulticastOperation operation)
+{
+    furi_check(ip_addr.IsIPv6Multicast());
+
+    struct in6_addr addr = ip_addr.ToIPv6();
+    sl_ip_address_t sl_ip_addr = {
+        .type = SL_IPV6,
+    };
+    memcpy(&sl_ip_addr.ip.v6.bytes, &addr, sizeof(addr));
+    swap_addr_byteorder(&sl_ip_addr.ip.v6.bytes);
+
+    sl_status_t status;
+    bool join = operation == UDPEndPointImplSockets::MulticastOperation::kJoin;
+    if(join) {
+        status = sl_net_join_multicast_address((sl_net_interface_t)SL_NET_WIFI_CLIENT_INTERFACE, &sl_ip_addr);
+    } else {
+        status = sl_net_leave_multicast_address((sl_net_interface_t)SL_NET_WIFI_CLIENT_INTERFACE, &sl_ip_addr);
+    }
+
+    if(status != SL_STATUS_OK) {
+        ChipLogError(Inet, "sl_net_%s_multicast_address failed: %x", join ? "join" : "leave", status);
+        return CHIP_ERROR_NOT_IMPLEMENTED; // TODO: which error code would be better?
+    }
+
+    return CHIP_NO_ERROR;
+}
 
 CHIP_ERROR SilabsPlatform::Init(void)
 {
@@ -110,6 +159,8 @@ CHIP_ERROR SilabsPlatform::Init(void)
 #ifdef SL_CATALOG_SYSTEMVIEW_TRACE_PRESENT
     SEGGER_SYSVIEW_Conf();
 #endif
+
+    UDPEndPointImplSockets::SetMulticastGroupHandler(&MulticastHandler);
 
     return CHIP_NO_ERROR;
 }

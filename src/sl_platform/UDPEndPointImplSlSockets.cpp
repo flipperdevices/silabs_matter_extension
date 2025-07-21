@@ -508,10 +508,16 @@ void UDPEndPointImplSlSockets::Free()
     Release();
 }
 
+extern "C" {
+FuriMessageQueue* multicast_join_backlog;
+}
+
 CHIP_ERROR UDPEndPointImplSlSockets::GetSocket(IPAddressType addressType)
 {
     if (mSocket == kInvalidSocketFd)
     {
+        multicast_join_backlog = furi_message_queue_alloc(4, sizeof(sl_ip_address_t));
+
         constexpr int type     = SOCK_DGRAM;
         constexpr int protocol = IPPROTO_UDP;
 
@@ -821,6 +827,10 @@ CHIP_ERROR UDPEndPointImplSlSockets::IPv6JoinLeaveMulticastGroupImpl(InterfaceId
 
     if(status != SL_STATUS_OK) {
         ChipLogError(Inet, "sl_net_%s_multicast_address failed: %x", join ? "join" : "leave", status);
+
+        if(join)
+            furi_check(furi_message_queue_put(multicast_join_backlog, &sl_ip_addr, 0) == FuriStatusOk);
+
         return CHIP_ERROR_NOT_IMPLEMENTED; // TODO: which error code would be better?
     }
 

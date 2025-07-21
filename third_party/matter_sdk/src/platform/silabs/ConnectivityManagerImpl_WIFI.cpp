@@ -113,7 +113,7 @@ void ConnectivityManagerImpl::_OnPlatformEvent(const ChipDeviceEvent * event)
                                      const_cast<fd_set *>(&event->SocketSelectStart.ErrorSet), nullptr, sl_wifi_async_select_cb);
         if (result < 0)
         {
-            ChipLogError(DeviceLayer, "sl_si91x_select() failed: %d", result);
+            ChipLogError(DeviceLayer, "sl_si91x_select() failed: %d, errno=%d", result, errno);
         }
     }
 #endif // CHIP_SYSTEM_CONFIG_USE_FREERTOS_SOCKETS

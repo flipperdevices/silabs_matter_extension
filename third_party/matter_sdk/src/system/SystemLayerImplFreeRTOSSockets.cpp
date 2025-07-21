@@ -306,7 +306,7 @@ CHIP_ERROR LayerImplFreeRTOSSockets::StopWatchingSocket(SocketWatchToken * token
     VerifyOrReturnError(watch != nullptr, CHIP_ERROR_INVALID_ARGUMENT);
 
     // Free the SocketWatch structure
-    delete watch;
+    // delete watch;
     return CHIP_NO_ERROR;
 }
 
