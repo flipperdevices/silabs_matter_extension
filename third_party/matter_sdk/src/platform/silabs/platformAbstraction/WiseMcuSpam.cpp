@@ -112,6 +112,20 @@ static void swap_addr_byteorder(void* v6_addr) {
     }
 }
 
+static const uint8_t dummy_addr[16] = {
+    0xff, 0x0e, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x01, 0x01,
+};
+
+static const uint8_t mdns_addr[16] = {
+    0xff, 0x02, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0xfb,
+};
+
 static CHIP_ERROR MulticastHandler(InterfaceId iface_id, const IPAddress & ip_addr, UDPEndPointImplSockets::MulticastOperation operation)
 {
     furi_check(ip_addr.IsIPv6Multicast());
@@ -121,7 +135,14 @@ static CHIP_ERROR MulticastHandler(InterfaceId iface_id, const IPAddress & ip_ad
         .type = SL_IPV6,
     };
     memcpy(&sl_ip_addr.ip.v6.bytes, &addr, sizeof(addr));
-    swap_addr_byteorder(&sl_ip_addr.ip.v6.bytes);
+    // memcpy(&sl_ip_addr.ip.v6.bytes, &dummy_addr, sizeof(addr));
+    // memcpy(&sl_ip_addr.ip.v6.bytes, &mdns_addr, sizeof(addr));
+
+    for(size_t i = 0; i < 16; i++) {
+        FURI_LOG_I("addr", "%02x  %02x", sl_ip_addr.ip.v6.bytes[i], *((uint8_t*)&addr + i));
+    }
+
+    // swap_addr_byteorder(&sl_ip_addr.ip.v6.bytes);
 
     sl_status_t status;
     bool join = operation == UDPEndPointImplSockets::MulticastOperation::kJoin;
@@ -130,6 +151,8 @@ static CHIP_ERROR MulticastHandler(InterfaceId iface_id, const IPAddress & ip_ad
     } else {
         status = sl_net_leave_multicast_address((sl_net_interface_t)SL_NET_WIFI_CLIENT_INTERFACE, &sl_ip_addr);
     }
+
+    FURI_LOG_I("mcast", "status: %x", status);
 
     if(status != SL_STATUS_OK) {
         ChipLogError(Inet, "sl_net_%s_multicast_address failed: %x", join ? "join" : "leave", status);

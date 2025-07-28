@@ -361,7 +361,7 @@ sl_status_t SetWifiConfigurations()
     {
         status = sl_net_set_credential(SL_NET_DEFAULT_WIFI_CLIENT_CREDENTIAL_ID, SL_NET_WIFI_PSK, &wfx_rsi.sec.passkey[0],
                                        wfx_rsi.sec.passkey_length);
-        status = sl_net_set_credential(SL_NET_DEFAULT_WIFI_CLIENT_CREDENTIAL_ID, SL_NET_WIFI_PSK, "susamogus", 9);
+        // status = sl_net_set_credential(SL_NET_DEFAULT_WIFI_CLIENT_CREDENTIAL_ID, SL_NET_WIFI_PSK, "susamogus", 9);
         VerifyOrReturnError(status == SL_STATUS_OK, status,
                             ChipLogError(DeviceLayer, "sl_net_set_credential failed: 0x%lx", status));
     }
@@ -370,8 +370,8 @@ sl_status_t SetWifiConfigurations()
         .config = {
             .ssid = {
                 //static cast because the types dont match
-                // .length = static_cast<uint8_t>(wfx_rsi.sec.ssid_length),
-                .length = 7,
+                .length = static_cast<uint8_t>(wfx_rsi.sec.ssid_length),
+                // .length = 7,
             },
             .channel = {
                 .channel = SL_WIFI_AUTO_CHANNEL,
@@ -414,8 +414,8 @@ sl_status_t SetWifiConfigurations()
     profile.ip.ip.v6.gateway.value[3]            = kIPv6GlobalAddressPlaceholder;
 #endif
     // TODO: memcpy for now since the types dont match
-    // memcpy((char *) &profile.config.ssid.value, wfx_rsi.sec.ssid, wfx_rsi.sec.ssid_length);
-    memcpy((char *) &profile.config.ssid.value, "psi3-pc", 7);
+    memcpy((char *) &profile.config.ssid.value, wfx_rsi.sec.ssid, wfx_rsi.sec.ssid_length);
+    // memcpy((char *) &profile.config.ssid.value, "psi3-pc", 7);
 
     status = sl_net_set_profile((sl_net_interface_t) SL_NET_WIFI_CLIENT_INTERFACE, SL_NET_DEFAULT_WIFI_CLIENT_PROFILE_ID, &profile);
     VerifyOrReturnError(status == SL_STATUS_OK, status, ChipLogError(DeviceLayer, "sl_net_set_profile failed: 0x%lx", status));
