@@ -181,7 +181,7 @@ void UDPEndPointImplSlSockets::async_socket_callback(uint32_t socket, uint8_t *b
         FURI_LOG_E("UDP", "async recv on unbound socket %u", socket);
         return;
     }
-    FURI_LOG_I("UDP", "Recv %d", length);
+    // FURI_LOG_I("UDP", "Recv %d", length);
     // for(size_t i = 0; i < 16; i++) {
     //     FURI_LOG_I("UDPrecvaddr", "%x", *((uint8_t*)&firmware_socket_response->dest_ip_addr + i));
     // }
@@ -315,7 +315,7 @@ CHIP_ERROR UDPEndPointImplSlSockets::ListenImpl()
 
 CHIP_ERROR UDPEndPointImplSlSockets::SendMsgImpl(const IPPacketInfo * aPktInfo, System::PacketBufferHandle && msg)
 {
-    FURI_LOG_I("UDP", "Send %d", msg->DataLength());
+    // FURI_LOG_I("UDP", "Send %d", msg->DataLength());
 
     // Ensure packet buffer is not null
     VerifyOrReturnError(!msg.IsNull(), CHIP_ERROR_INVALID_ARGUMENT);
@@ -467,7 +467,7 @@ CHIP_ERROR UDPEndPointImplSlSockets::SendMsgImpl(const IPPacketInfo * aPktInfo, 
     // const ssize_t lenSent = sendto(mSocket, msg->Start(), msg->DataLength(), 0, (const struct sockaddr*)&sockaddr, sizeof(sockaddr));
     const ssize_t lenSent = sl_si91x_sendto(mSocket, msg->Start(), msg->DataLength(), 0, (const struct sockaddr*)&sockaddr, sizeof(sockaddr));
 
-    FURI_LOG_I("UDP", "%d", lenSent);
+    // FURI_LOG_I("UDP", "%d", lenSent);
     if (lenSent == -1)
     {
         return CHIP_ERROR_POSIX(errno);
@@ -531,7 +531,7 @@ CHIP_ERROR UDPEndPointImplSlSockets::GetSocket(IPAddressType addressType)
         }
 
         mSocket = sl_si91x_socket_async(family, type, protocol, UDPEndPointImplSlSockets::async_socket_callback);
-        FURI_LOG_I("UDP", "init %d", mSocket);
+        // FURI_LOG_I("UDP", "init %d", mSocket);
         UDPEndPointImplSlSockets::map.associate(mSocket, this);
         if (mSocket == -1)
         {
@@ -632,7 +632,7 @@ CHIP_ERROR UDPEndPointImplSlSockets::GetSocket(IPAddressType addressType)
 
 void UDPEndPointImplSlSockets::HandlePendingIO(SocketInboundEvent* event)
 {
-    FURI_LOG_I("UDP", "recv chip ctx");
+    // FURI_LOG_I("UDP", "recv chip ctx");
     CHIP_ERROR lStatus = CHIP_NO_ERROR;
     IPPacketInfo lPacketInfo;
     System::PacketBufferHandle lBuffer;
@@ -656,7 +656,7 @@ void UDPEndPointImplSlSockets::HandlePendingIO(SocketInboundEvent* event)
             // lPacketInfo.Interface  = InterfaceId(static_cast<InterfaceId::PlatformType>(0));
             lPacketInfo.SrcAddress = IPAddress(static_cast<const struct in6_addr>(addr));
             lPacketInfo.SrcPort    = event->metadata.dest_port;
-            FURI_LOG_I("UDPrev", "port %d", lPacketInfo.SrcPort);
+            // FURI_LOG_I("UDPrev", "port %d", lPacketInfo.SrcPort);
         } else {
             lStatus = CHIP_ERROR_INCORRECT_STATE;
         }
@@ -837,7 +837,7 @@ UDPEndPointImplSlSockets::SocketEndpointMap::~SocketEndpointMap() {
 }
 
 void UDPEndPointImplSlSockets::SocketEndpointMap::associate(uint32_t socket, UDPEndPointImplSlSockets* endpoint) {
-    FURI_LOG_W("SocketEndpointMap", "associate %lu", socket);
+    // FURI_LOG_I("SocketEndpointMap", "associate %lu", socket);
     furi_check(furi_mutex_acquire(mutex, FuriWaitForever) == FuriStatusOk);
     for(size_t i = 0; i < MAX_UDP_ENDPOINTS; i++) {
         if(!associations[i].endpoint) {
@@ -847,25 +847,17 @@ void UDPEndPointImplSlSockets::SocketEndpointMap::associate(uint32_t socket, UDP
         }
     }
 
-    for(size_t i = 0; i < MAX_UDP_ENDPOINTS; i++) {
-        FURI_LOG_W("SocketEndpointMap", "[%d] %lu %p", i, associations[i].socket, associations[i].endpoint);
-    }
-
     furi_check(furi_mutex_release(mutex) == FuriStatusOk);
 }
 
 void UDPEndPointImplSlSockets::SocketEndpointMap::deassociate(uint32_t socket) {
-    FURI_LOG_W("SocketEndpointMap", "deassociate %lu", socket);
+    // FURI_LOG_I("SocketEndpointMap", "deassociate %lu", socket);
     furi_check(furi_mutex_acquire(mutex, FuriWaitForever) == FuriStatusOk);
     for(size_t i = 0; i < MAX_UDP_ENDPOINTS; i++) {
         if(associations[i].socket == socket) {
             memset(&associations[i], 0, sizeof(SocketEndpointAssociation));
             break;
         }
-    }
-
-    for(size_t i = 0; i < MAX_UDP_ENDPOINTS; i++) {
-        FURI_LOG_W("SocketEndpointMap", "[%d] %lu %p", i, associations[i].socket, associations[i].endpoint);
     }
 
     furi_check(furi_mutex_release(mutex) == FuriStatusOk);
@@ -880,10 +872,6 @@ UDPEndPointImplSlSockets* UDPEndPointImplSlSockets::SocketEndpointMap::get_endpo
             ret = associations[i].endpoint;
             break;
         }
-    }
-
-    for(size_t i = 0; i < MAX_UDP_ENDPOINTS; i++) {
-        FURI_LOG_W("SocketEndpointMap", "[%d] %lu %p", i, associations[i].socket, associations[i].endpoint);
     }
 
     furi_check(furi_mutex_release(mutex) == FuriStatusOk);
