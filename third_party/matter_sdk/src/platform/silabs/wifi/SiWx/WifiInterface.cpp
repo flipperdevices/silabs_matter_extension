@@ -134,18 +134,18 @@ const sl_wifi_device_configuration_t config = {
                                          // TODO: remove this once it is enabled in the firmware
                                          | BIT(18)
 #endif // SLI_SI91X_OFFLOAD_NETWORK_STACK
-#ifndef SLI_SI91X_MCU_INTERFACE
-                                         // configurations for the NCP mode only
-                                         | SL_SI91X_FEAT_ULP_GPIO_BASED_HANDSHAKE | SL_SI91X_FEAT_DEV_TO_HOST_ULP_GPIO_1 |
-                                         SL_SI91X_FEAT_AGGREGATION
-#endif
+// #ifndef SLI_SI91X_MCU_INTERFACE
+//                                          // configurations for the NCP mode only
+//                                          | SL_SI91X_FEAT_ULP_GPIO_BASED_HANDSHAKE | SL_SI91X_FEAT_DEV_TO_HOST_ULP_GPIO_1 |
+//                                          SL_SI91X_FEAT_AGGREGATION
+// #endif
                                          ),
                      .tcp_ip_feature_bit_map = (
-#if SLI_SI91X_OFFLOAD_NETWORK_STACK
-                         SL_SI91X_TCP_IP_FEAT_DHCPV6_CLIENT | SL_SI91X_TCP_IP_FEAT_IPV6 | SL_SI91X_TCP_IP_FEAT_MDNSD
-#elif SLI_SI91X_LWIP_HOSTED_NETWORK_STACK
-                         SL_SI91X_TCP_IP_FEAT_BYPASS
-#endif
+// #if SLI_SI91X_OFFLOAD_NETWORK_STACK
+                         SL_SI91X_TCP_IP_FEAT_IPV6
+// #elif SLI_SI91X_LWIP_HOSTED_NETWORK_STACK
+//                          SL_SI91X_TCP_IP_FEAT_BYPASS
+// #endif
                          | SL_SI91X_TCP_IP_FEAT_ICMP | SL_SI91X_TCP_IP_FEAT_EXTENSION_VALID),
                      .custom_feature_bit_map     = (SL_SI91X_CUSTOM_FEAT_EXTENTION_VALID),
                      .ext_custom_feature_bit_map = (RSI_EXT_CUSTOM_FEATURE_BIT_MAP | (SL_SI91X_EXT_FEAT_BT_CUSTOM_FEAT_ENABLE)
